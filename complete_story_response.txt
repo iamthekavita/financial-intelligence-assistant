@@ -1,0 +1,74 @@
+Current Code Story
+
+Overall flow
+The app is structured as a 3-step Streamlit RAG pipeline in app.py:
+
+1. Prepare RAG Data
+   - Fetches financial company profiles from services/api_service.py
+   - Scrapes company links from upstox.com
+   - Converts both sources into text chunks via services/processing_service.py
+   - Stores processed chunks in st.session_state
+
+2. Create Vector DB
+   - Combines API chunks + a subset of scraped chunks
+   - Generates embeddings using services/embedding_service.py
+   - Builds a FAISS vector index in services/vector_store.py
+   - Stores the vector store in session state
+
+3. Search
+   - Embeds the user query
+   - Retrieves top-k matching chunks
+   - Calls services/llm_service.generate_answer(...)
+   - Displays the answer and retrieved context
+
+Key implementation details
+
+services/api_service.py
+- Uses Financial Modeling Prep stable profile endpoint:
+  - https://financialmodelingprep.com/stable/profile?symbol={company}&apikey=...
+- Fetches 5 symbols asynchronously
+- Returns a dict mapping ticker to API payload
+
+services/processing_service.py
+- Converts API data into simple records with:
+  - company, price, marketCap
+- Converts scraped data into:
+  - company, url
+- Builds text chunks for retrieval
+
+services/embedding_service.py
+- Uses sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
+- Returns embeddings as Python lists
+- This is currently the active embedding path, not google.genai
+
+services/vector_store.py
+- Uses FAISS IndexFlatIP(dim) for similarity search
+- Normalizes embeddings and query vectors
+- Returns top-k retrieved text chunks
+
+services/llm_service.py
+- Builds a prompt with explicit structured output requirements:
+  - Reasoning:
+  - Answer:
+  - Key Insights:
+  - Data Used:
+- Sends prompt to local endpoint:
+  - http://localhost:11434/api/generate
+- Current search path uses stream=False
+- A streaming helper generate_answer_stream() exists but is not wired into app.py
+
+Loader / UI behavior
+- app.py now wraps answer generation in:
+  - with st.spinner("Searching and generating answer..."):
+- This means:
+  - The user sees a visible loading indicator while the LLM request is in progress
+  - The app waits for the full response before rendering the answer
+
+Status summary
+- ✅ Search loader is implemented and visible
+- ✅ RAG pipeline is wired end-to-end in the current app
+- ✅ Embedding generation uses a working local model
+- ⚠️ The LLM call is still non-streaming, so the UI only shows a final answer after completion
+- ⚠️ Structured reasoning depends on the backend model obeying the prompt
+
+If you want, I can next wire generate_answer_stream() into app.py so the answer appears incrementally instead of only after the full request finishes.
