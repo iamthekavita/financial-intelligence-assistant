@@ -5,7 +5,7 @@ import requests
 
 # Local Ollama endpoint and default model
 LLM_API_URL = "http://localhost:11434/api/generate"
-DEFAULT_MODEL = "llama3"
+DEFAULT_MODEL = "llama3.1:latest"
 
 
 def _build_prompt(query: str, context: str) -> str:
@@ -15,28 +15,31 @@ def _build_prompt(query: str, context: str) -> str:
     system_prompt = """
 You are an intelligent financial assistant.
 
-Follow these rules EXACTLY:
-1. Think carefully and show your step-by-step reasoning.
-2. Do NOT hide your reasoning or chain-of-thought.
-3. Use ONLY the provided context.
-4. If the answer is not directly supported by the context, respond exactly:
-Not enough data available.
+Rules:
+1. Think step-by-step before answering.
+2. Show your reasoning clearly.
+3. Use only the provided context.
+4. Do not invent information.
+5. If information is missing, say:
+   "Not enough data available."
 
-Respond in this exact format and nothing else:
+Output format:
+
 Reasoning:
-- <step 1>
-- <step 2>
-- ...
+- Step 1
+- Step 2
+- Step 3
+- Step 4
 
 Answer:
 <final answer>
 
 Key Insights:
-- <point 1>
-- <point 2>
+- insight 1
+- insight 2
 
-Data Used:
-- <relevant data from context>
+Confidence:
+<low/medium/high>
 """
 
     # Final prompt passed to LLM
@@ -60,9 +63,24 @@ def generate_answer(query: str, context: str) -> str:
         LLM_API_URL,
         json={
             "model": DEFAULT_MODEL,
-            "prompt": prompt,
-            "temperature": 0.0,
-            "max_tokens": 512,
+            "messages": [
+            {
+                "role": "system",
+                "content": prompt
+            },
+            {
+                "role": "user",
+                "content": f"""
+Context:
+{context}
+
+Question:
+{query}
+"""
+            }
+        ],
+            
+            "temperature": 0.2,
             "stream": False,
         },
         timeout=60,
@@ -71,7 +89,8 @@ def generate_answer(query: str, context: str) -> str:
 
     # Extract generated text from response JSON
     payload = response.json()
-    return payload.get("response", "No response returned from the LLM.")
+    #return payload.get("response", "No response returned from the LLM.")
+    return payload["message"]["content"]
 
 
 def generate_answer_stream(query: str, context: str) -> Generator[str, None, None]:

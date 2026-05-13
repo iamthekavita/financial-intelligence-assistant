@@ -5,7 +5,7 @@ import asyncio
 # Service layer imports (each handles a specific responsibility)
 from services.api_service import fetch_all_companies
 from services.embedding_service import get_embedding
-from services.llm_service import generate_answer
+from services.llm_service import generate_answer_stream
 from services.processing_service import (
     api_to_dataframe,
     dataframe_to_text_chunks,
@@ -92,10 +92,17 @@ def search_and_answer(query: str):
     context = "\n".join(results)
 
     with st.spinner("Searching and generating answer..."):
-        answer = generate_answer(query, context)
+        #answer = generate_answer(query, context)
+        response_placeholder = st.empty()
 
-    st.subheader("Answer")
-    st.write(answer)
+        full_response = ""
+
+        for chunk in generate_answer_stream(query, context):
+            full_response += chunk
+            response_placeholder.markdown(full_response)
+
+        st.subheader("Answer")
+        #st.write(answer)
 
     # Optional: show retrieved chunks for transparency/debugging
     st.subheader("Retrieved Context")
