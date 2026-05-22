@@ -42,9 +42,10 @@ def dataframe_to_text_chunks(df: pd.DataFrame, source: str = "api") -> List[str]
         if source == "api":
             text = (
                 f"Company: {row['company']} | "
-                f"Price: {row['price']} | "
-                f"MarketCap: {row['marketCap']}"
-            )
+                f"Stock Price: {row['price']} | "
+                f"Market Capitalization: {row['marketCap']} | "
+                f"This is financial information for {row['company']}"
+        )
         else:
             text = f"Company: {row['company']} | Stock Page: {row['url']}"
 

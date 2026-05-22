@@ -5,7 +5,7 @@ import asyncio
 # Service layer imports (each handles a specific responsibility)
 from services.api_service import fetch_all_companies
 from services.embedding_service import get_embedding
-from services.llm_service import generate_answer_stream
+from services.llm_service import generate_answer
 from services.processing_service import (
     api_to_dataframe,
     dataframe_to_text_chunks,
@@ -13,6 +13,9 @@ from services.processing_service import (
 )
 from services.scraper_service import fetch_upstox_companies
 from services.vector_store import VectorStore
+from services.router_agent import route_query
+from services.retrieval_agent import retrieve_context
+
 
 # Streamlit page setup
 st.set_page_config(page_title="Financial Intelligence RAG System")
@@ -53,7 +56,7 @@ def create_vector_db():
     st.info("Generating embeddings and building the vector database...")
 
     # Combine both data sources (limit web data to avoid too many embeddings)
-    all_chunks = st.session_state.api_chunks + st.session_state.scraped_chunks[:200]
+    all_chunks = st.session_state.api_chunks + st.session_state.scraped_chunks[:20]
 
     # Convert each chunk into vector representation
     embeddings = [get_embedding(text) for text in all_chunks]
@@ -71,9 +74,8 @@ def create_vector_db():
     st.session_state.vector_store = vector_store
     st.success("Vector DB created successfully.")
 
-
 def search_and_answer(query: str):
-    """Run a vector search on the query, build context, and request a final answer from the LLM."""
+
     if "vector_store" not in st.session_state:
         st.error("Please create the vector database before searching.")
         return
@@ -82,34 +84,40 @@ def search_and_answer(query: str):
         st.warning("Enter a question before clicking Search.")
         return
 
-    # Convert query into embedding
-    query_embedding = get_embedding(query)
+    # -------------------------------
+    # Router Agent decides workflow
+    # -------------------------------
+    selected_agent = route_query(query)
 
-    # Retrieve most relevant chunks
-    results = st.session_state.vector_store.search(query_embedding, k=5)
+    # Show selected agent in UI
+    st.info(f"Selected Agent: {selected_agent}")
 
-    # Combine chunks into context for LLM
+    # -------------------------------
+    # Retrieval Agent performs search
+    # -------------------------------
+    results = retrieve_context(
+        query,
+        st.session_state.vector_store
+    )
+
+    # Build context for LLM
     context = "\n".join(results)
 
+    # Generate final response
     with st.spinner("Searching and generating answer..."):
-        #answer = generate_answer(query, context)
-        response_placeholder = st.empty()
 
-        full_response = ""
+        answer = generate_answer(
+            query,
+            context
+        )
 
-        for chunk in generate_answer_stream(query, context):
-            full_response += chunk
-            response_placeholder.markdown(full_response)
+    st.subheader("Answer")
+    st.write(answer)
 
-        st.subheader("Answer")
-        #st.write(answer)
-
-    # Optional: show retrieved chunks for transparency/debugging
     st.subheader("Retrieved Context")
+
     for idx, chunk in enumerate(results, start=1):
         st.write(f"{idx}. {chunk}")
-
-
 # ---------------- User Actions ----------------
 if st.button("Prepare RAG Data"):
     prepare_rag_data()

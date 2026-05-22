@@ -90,7 +90,7 @@ Question:
     # Extract generated text from response JSON
     payload = response.json()
     #return payload.get("response", "No response returned from the LLM.")
-    return payload["message"]["content"]
+    return payload["response"]
 
 
 def generate_answer_stream(query: str, context: str) -> Generator[str, None, None]:
