@@ -34,7 +34,7 @@
 
 #     # Check financial/API queries
 #     if any(word in query for word in api_keywords):
-#         return "API Agent"
+#         return "API Tool"
 
 #     # Default semantic search
 #     return "RAG Agent"
@@ -57,23 +57,16 @@ def route_query(query: str) -> str:
     prompt = f"""
 You are a routing agent.
 
-Available agents:
-1. API Agent
-2. Web Agent
-3. RAG Agent
+Choose ONLY one:
 
-Rules:
-- API Agent handles financial/company data queries.
-- Web Agent handles URL, stock page, or website queries.
-- RAG Agent handles semantic search, comparisons, or general reasoning.
+API Agent
+Web Agent
+RAG Agent
 
 User Query:
 {query}
 
-Return ONLY one of:
-API Agent
-Web Agent
-RAG Agent
+Return ONLY the agent name.
 """
 
     response = requests.post(
@@ -84,11 +77,22 @@ RAG Agent
             "stream": False,
             "temperature": 0
         },
-        timeout=30
+        timeout=120
     )
 
     response.raise_for_status()
 
     result = response.json()["response"].strip()
 
-    return result
+    # Normalize LLM output
+    if "Web Agent" in result:
+        return "Web Agent"
+
+    elif "API Agent" in result:
+        return "API Agent"
+
+    elif "RAG Agent" in result:
+        return "RAG Agent"
+
+    # Safe fallback
+    return "RAG Agent"
