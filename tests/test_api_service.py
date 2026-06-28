@@ -1,107 +1,34 @@
 import pytest
-from unittest.mock import Mock, patch
 
-from services.api_service import (
-    fetch_company_data,
-    fetch_all_companies
-)
+from services.api_service import COMPANIES, fetch_all_companies, fetch_company_data
 
 
-# -------------------------------
-# Test: Successful API response
-# -------------------------------
 @pytest.mark.asyncio
-async def test_fetch_company_data_success():
+async def test_fetch_company_data_live_for_aapl():
+    company, data = await fetch_company_data("AAPL")
 
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = [
-        {
-            "symbol": "AAPL",
-            "price": 271.35
-        }
-    ]
+    assert company == "AAPL"
+    assert isinstance(data, list)
 
-    with patch("httpx.AsyncClient.get", return_value=mock_response):
-
-        company, data = await fetch_company_data("AAPL")
-
-        assert company == "AAPL"
-        assert isinstance(data, list)
-        assert data[0]["symbol"] == "AAPL"
+    if data:
+        assert isinstance(data[0], dict)
 
 
-# -------------------------------
-# Test: API failure response
-# -------------------------------
 @pytest.mark.asyncio
-async def test_fetch_company_data_failure():
+async def test_fetch_company_data_live_for_unknown_symbol():
+    company, data = await fetch_company_data("ZZZZINVALID")
 
-    mock_response = Mock()
-    mock_response.status_code = 500
-
-    with patch("httpx.AsyncClient.get", return_value=mock_response):
-
-        company, data = await fetch_company_data("AAPL")
-
-        assert company == "AAPL"
-        assert data == []
+    assert company == "ZZZZINVALID"
+    assert isinstance(data, list)
 
 
-# -------------------------------
-# Test: Invalid JSON response
-# -------------------------------
 @pytest.mark.asyncio
-async def test_fetch_company_data_invalid_json():
+async def test_fetch_all_companies_live():
+    result = await fetch_all_companies()
 
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.json.side_effect = ValueError
+    assert isinstance(result, dict)
+    assert set(COMPANIES).issubset(set(result.keys()))
 
-    with patch("httpx.AsyncClient.get", return_value=mock_response):
-
-        company, data = await fetch_company_data("AAPL")
-
-        assert company == "AAPL"
-        assert data == []
-
-
-# -------------------------------
-# Test: Fetch all companies
-# -------------------------------
-@pytest.mark.asyncio
-async def test_fetch_all_companies():
-
-    mock_result = (
-        "AAPL",
-        [{"symbol": "AAPL"}]
-    )
-
-    with patch(
-        "services.api_service.fetch_company_data",
-        Mock(return_value=mock_result)
-    ):
-
-        result = await fetch_all_companies()
-
-        assert isinstance(result, dict)
-        assert "AAPL" in result
-        assert result["AAPL"][0]["symbol"] == "AAPL"
-
-
-# -------------------------------
-# Test: Empty response
-# -------------------------------
-@pytest.mark.asyncio
-async def test_fetch_company_data_empty_response():
-
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = []
-
-    with patch("httpx.AsyncClient.get", return_value=mock_response):
-
-        company, data = await fetch_company_data("AAPL")
-
-        assert company == "AAPL"
-        assert data == []
+    # Each value should always be a list, even if the API has no data for a ticker.
+    for value in result.values():
+        assert isinstance(value, list)

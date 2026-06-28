@@ -22,6 +22,8 @@ from services.vector_store import VectorStore
 st.set_page_config(page_title="Financial Intelligence RAG System")
 st.title("Financial Intelligence RAG System")
 
+MAX_RETRIEVED_CONTEXT = 5
+
 
 # -------------------------------------------------------
 # STEP 1 → Fetch and prepare RAG data
@@ -248,9 +250,18 @@ def search_and_answer(query: str):
             results.extend(rag_results)
 
     # ---------------------------------------------------
-    # Build Context for Final LLM
+    # Build a clean, capped context set for the final LLM
     # ---------------------------------------------------
-    context = "\n".join(results)
+    unique_results = []
+    seen = set()
+
+    for item in results:
+        if item not in seen:
+            seen.add(item)
+            unique_results.append(item)
+
+    retrieved_context = unique_results[:MAX_RETRIEVED_CONTEXT]
+    context = "\n".join(retrieved_context)
 
     # ---------------------------------------------------
     # Final LLM Response
@@ -326,7 +337,7 @@ def search_and_answer(query: str):
     st.subheader("Retrieved Context")
 
     for idx, chunk in enumerate(
-        results,
+        retrieved_context,
         start=1
     ):
 
